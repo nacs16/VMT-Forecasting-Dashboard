@@ -37,38 +37,8 @@ def plot_multiple_series(df):
     return fig
 
 def run_forecast_pressed(df):
-    st.text("Forecasting Log")
-    st.write(df.head())
-    st.write(st.session_state["uploaded_file_metric"])
-    df.plot()
-    try:
-        #st.session_state["forecasted_series"], st.session_state["forecasted_accuracy_metrics"] = run_VAR_forecast(df, st.session_state["uploaded_file_metric"])
-
-        st.text("Differencing the data")
-        df_diff = df.diff(7)
-        df_diff.plot()
-        nobs=30
-        st.text("Train test split")
-        df_diff_train, df_diff_test = df_diff.iloc[0:-nobs].copy(), df_diff.iloc[-30:].copy()
-        st.text("Init the model")
-        model = VAR(df_diff_train, freq='d')
-        st.text("Determine Lag Order")
-        #lag_order = model.select_order().selected_orders['aic'] # ['aic', 'bic', 'hqic', 'fpe']
-        lag_order = 16
-        trend_parameter = 'c'
-        st.text("Fitting the model")
-        model_fit = model.fit(lag_order, trend=trend_parameter)
-        st.text("Running the forecast")        
-        forecast = pd.DataFrame(model_fit.forecast(y=df_diff_train[-lag_order:].values, steps=nobs), index=df_diff_test.index, columns=df_diff_test.columns)
-        st.text("Undifferencing the forecast")
-        forecast_undiff = invert_diff(df, forecast, periods=7)[st.session_state["uploaded_file_metric"]]
-        st.text("Calculating accuracy and returning")
-        st.session_state["forecasted_series"] = forecast_undiff
-        st.session_state["forecasted_accuracy_metrics"] = score_forecast(forecast_undiff, df[-nobs:][st.session_state["uploaded_file_metric"]])
-        st.session_state["forecast_done"] = True
-    except:
-        st.error("ERROR")
-        return None
+    st.session_state["forecasted_series"], st.session_state["forecasted_accuracy_metrics"] = run_VAR_forecast(df, st.session_state["uploaded_file_metric"])
+    st.session_state["forecast_done"] = True
 
 def style_button_row(clicked_button_ix, n_buttons):
     def get_button_indices(button_ix):
@@ -177,9 +147,6 @@ def uploaded_file_ready_clicked():
     try:
         with st.spinner("Performing data cleaning steps on your input file..."):
             st.session_state["uploaded_df"] = pd.to_numeric(st.session_state["uploaded_df"][st.session_state["uploaded_file_filter"]][st.session_state["uploaded_file_metric"]])
-            #st.text("Filters applied successfully. Length = {}".format(len(st.session_state["uploaded_df"])))
-            st.session_state["uploaded_df"].to_pickle("uploaded_df_troubleshooting.pkl")
-            #st.text("Saved to Pickle Success")
             st.session_state["uploaded_df"] = clean_series(st.session_state["uploaded_df"])
             st.session_state["uploaded_file_ready"] = True
     except:
@@ -260,7 +227,6 @@ if "vmt_df" in st.session_state:
         plot_this2.name = st.session_state["uploaded_file_metric"]
         plot_this = pd.DataFrame(plot_this, index=plot_this.index).join(plot_this2, how="inner").dropna()
         
-        plot_this.to_pickle("web_app_plot_this_df.pkl")
         #st.pyplot(plot_multiple_series(plot_this))
        
         layout = go.Layout(autosize=False,width=1000,height=600)
@@ -295,4 +261,5 @@ if "vmt_df" in st.session_state:
 
 with st.sidebar:
     if st.session_state["uploaded_file_ready"] and st.session_state["forecast_done"] is False:
+        st.session_state["plot_this_df"] = plot_this
         run_forecast_button = st.button("Run Forecast!", on_click=run_forecast_pressed, args=[plot_this])
